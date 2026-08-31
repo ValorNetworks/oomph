@@ -120,7 +120,7 @@ func ReencodeLevelChunk(input *packet.LevelChunk, codec blocknetwork.Codec) erro
 		return fmt.Errorf("unknown dimension %v", input.Dimension)
 	}
 	buf := bytes.NewBuffer(input.RawPayload)
-	decoded, _, err := chunk.NetworkDecodeBuffer(BlockRegistry, buf, int(input.SubChunkCount), dimension.Range())
+	decoded, err := chunk.NetworkDecodeBuffer(BlockRegistry, buf, int(input.SubChunkCount), dimension.Range())
 	if err != nil {
 		return err
 	}
