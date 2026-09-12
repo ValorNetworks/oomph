@@ -1,3 +1,5 @@
+github.com/Hinduiism/dragonfly v0.11.4-valor.6 h1:060gZwrTYdgQnEIKlkTLb4SagY9xkiBhq+PUkqjKvFY=
+github.com/Hinduiism/dragonfly v0.11.4-valor.6/go.mod h1:5WrUSgnaseMvZbn6ylYYlJwggfD4ZethYeyjIN9O6Y0=
 github.com/brentp/intintmap v0.0.0-20251106190759-56907b1f8479 h1:UZbbt19ACBOFO+CiDQFjaEoPJkBhj7GNGtIq59WR6Os=
 github.com/brentp/intintmap v0.0.0-20251106190759-56907b1f8479/go.mod h1:TOk10ahXejq9wkEaym3KPRNeuR/h5Jx+s8QRWIa2oTM=
 github.com/cespare/xxhash/v2 v2.3.0 h1:UL815xU9SqsFlibzuggzjXhog7bL6oX9BbNZnL2UFvs=
@@ -60,8 +62,6 @@ github.com/onsi/ginkgo v1.16.5/go.mod h1:+E8gABHa3K6zRBolWtd+ROzc/U5bkGt0FwiG042
 github.com/onsi/gomega v1.4.3/go.mod h1:ex+gbHU/CVuBBDIJjb2X0qEXbFg53c61hWP/1CpauHY=
 github.com/onsi/gomega v1.17.0 h1:9Luw4uT5HTjHTN8+aNcSThgH1vdXnmdJ8xIfZ4wyTRE=
 github.com/onsi/gomega v1.17.0/go.mod h1:HnhC7FXeEQY45zxNK3PPoIUhzk/80Xly9PcubAlGdZY=
-github.com/oomph-ac/dragonfly v0.0.0-20260904153233-9221758c1eee h1:E1hLMWHME4K+n6Ptjlu2SAupPlQdu7zPGly6RqexFZk=
-github.com/oomph-ac/dragonfly v0.0.0-20260904153233-9221758c1eee/go.mod h1:5WrUSgnaseMvZbn6ylYYlJwggfD4ZethYeyjIN9O6Y0=
 github.com/pingcap/errors v0.11.4 h1:lFuQV/oaUMGcD2tqt+01ROSmJs75VG1ToEOkZIZ4nE4=
 github.com/pingcap/errors v0.11.4/go.mod h1:Oi8TUi2kEtXXLMJk9l1cGmz20kV3TaQ0usTwv5KuLY8=
 github.com/pion/datachannel v1.6.2 h1:7EXQ8TH3vTouBUdRWYbcX2edSx9Yj6k5zl5P+qyxEPc=

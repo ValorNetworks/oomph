@@ -2,7 +2,7 @@ module github.com/oomph-ac/oomph/anticheat
 
 go 1.26.0
 
-replace github.com/df-mc/dragonfly => github.com/oomph-ac/dragonfly v0.0.0-20260904153233-9221758c1eee
+replace github.com/df-mc/dragonfly => github.com/Hinduiism/dragonfly v0.11.4-valor.6
 
 replace github.com/oomph-ac/oomph/transferproxy => ../transferproxy
 
