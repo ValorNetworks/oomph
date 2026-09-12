@@ -38,6 +38,15 @@ type packetRead struct {
 	err    error
 }
 
+// ConnectionStats forwards transport observations without reading anti-cheat
+// player state or entering the synchronous game-processing path.
+func (c *sessionConn) ConnectionStats() (minecraft.ConnectionStats, bool) {
+	if source, ok := c.Conn.(minecraft.ConnectionStatsSource); ok {
+		return source.ConnectionStats()
+	}
+	return minecraft.ConnectionStats{}, false
+}
+
 func newSessionConn(raw session.Conn, p *player.Player) *sessionConn {
 	c := &sessionConn{
 		Conn:           raw,
