@@ -6,14 +6,14 @@ replace github.com/oomph-ac/oomph/anticheat => ../anticheat
 
 replace github.com/oomph-ac/oomph/transferproxy => ../transferproxy
 
-replace github.com/sandertv/go-raknet => ../go-raknet
+replace github.com/sandertv/go-raknet => github.com/ValorNetworks/go-raknet v0.0.0-20260912171643-ff3abea5648d
 
-replace github.com/sandertv/gophertunnel => ../gophertunnel
+replace github.com/sandertv/gophertunnel => github.com/ValorNetworks/gophertunnel v0.0.0-20260912185055-f18c9fae41b1
 
-replace github.com/df-mc/dragonfly => github.com/Hinduiism/dragonfly v0.11.4-valor.6
+replace github.com/df-mc/dragonfly => github.com/Hinduiism/dragonfly v0.11.4-valor.8
 
 require (
-	github.com/df-mc/dragonfly v0.10.14-0.20260508142332-b4a4d55303f9
+	github.com/df-mc/dragonfly v0.11.4-valor.8
 	github.com/getsentry/sentry-go v0.35.3
 	github.com/oomph-ac/oomph/anticheat v0.0.0-20260716201756-d5e22ec6b233
 	github.com/sandertv/gophertunnel v1.61.0

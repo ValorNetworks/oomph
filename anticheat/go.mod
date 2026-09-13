@@ -2,17 +2,17 @@ module github.com/oomph-ac/oomph/anticheat
 
 go 1.26.0
 
-replace github.com/df-mc/dragonfly => github.com/Hinduiism/dragonfly v0.11.4-valor.6
+replace github.com/df-mc/dragonfly => github.com/Hinduiism/dragonfly v0.11.4-valor.8
 
 replace github.com/oomph-ac/oomph/transferproxy => ../transferproxy
 
-replace github.com/sandertv/go-raknet => ../go-raknet
+replace github.com/sandertv/go-raknet => github.com/ValorNetworks/go-raknet v0.0.0-20260912171643-ff3abea5648d
 
-replace github.com/sandertv/gophertunnel => ../gophertunnel
+replace github.com/sandertv/gophertunnel => github.com/ValorNetworks/gophertunnel v0.0.0-20260912185055-f18c9fae41b1
 
 require (
 	github.com/chewxy/math32 v1.11.1
-	github.com/df-mc/dragonfly v0.10.14-0.20260508142332-b4a4d55303f9
+	github.com/df-mc/dragonfly v0.11.4-valor.8
 	github.com/ethaniccc/float32-cube v0.0.0-20250511224129-7af1f8c4ee12
 	github.com/go-gl/mathgl v1.2.0
 	github.com/hjson/hjson-go/v4 v4.6.0

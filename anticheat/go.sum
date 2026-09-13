@@ -1,5 +1,9 @@
-github.com/Hinduiism/dragonfly v0.11.4-valor.6 h1:060gZwrTYdgQnEIKlkTLb4SagY9xkiBhq+PUkqjKvFY=
-github.com/Hinduiism/dragonfly v0.11.4-valor.6/go.mod h1:5WrUSgnaseMvZbn6ylYYlJwggfD4ZethYeyjIN9O6Y0=
+github.com/Hinduiism/dragonfly v0.11.4-valor.8 h1:+RJZZ1xG2b+YAn4bQDAcWJ+i0OS3rmp7A2INheSYDNc=
+github.com/Hinduiism/dragonfly v0.11.4-valor.8/go.mod h1:JNrW1bvYwHo/oPCJDxHcMh32sfBsX5h0LBf/x9lo81c=
+github.com/ValorNetworks/go-raknet v0.0.0-20260912171643-ff3abea5648d h1:7Ft1uKh2c9tK0JjlbgfkW4xf3JCY1srcK0m3Vv5Eu4s=
+github.com/ValorNetworks/go-raknet v0.0.0-20260912171643-ff3abea5648d/go.mod h1:m8i0H2zIDryMgl0RLo/M/1BML0Oc6EpqgorBP9LgmKM=
+github.com/ValorNetworks/gophertunnel v0.0.0-20260912185055-f18c9fae41b1 h1:TKS7aXLku8bpOJxWUZKxvbEXmxquL5yYiGfgWxj4LCY=
+github.com/ValorNetworks/gophertunnel v0.0.0-20260912185055-f18c9fae41b1/go.mod h1:Z5DJYNTsHH27R18qCaMurOkohGauDvW4zQ6t2brQStc=
 github.com/brentp/intintmap v0.0.0-20251106190759-56907b1f8479 h1:UZbbt19ACBOFO+CiDQFjaEoPJkBhj7GNGtIq59WR6Os=
 github.com/brentp/intintmap v0.0.0-20251106190759-56907b1f8479/go.mod h1:TOk10ahXejq9wkEaym3KPRNeuR/h5Jx+s8QRWIa2oTM=
 github.com/cespare/xxhash/v2 v2.3.0 h1:UL815xU9SqsFlibzuggzjXhog7bL6oX9BbNZnL2UFvs=

@@ -2,13 +2,13 @@ module github.com/oomph-ac/oomph/transferproxy
 
 go 1.26.0
 
-replace github.com/sandertv/go-raknet => ../go-raknet
+replace github.com/sandertv/go-raknet => github.com/ValorNetworks/go-raknet v0.0.0-20260912171643-ff3abea5648d
 
-replace github.com/sandertv/gophertunnel => ../gophertunnel
+replace github.com/sandertv/gophertunnel => github.com/ValorNetworks/gophertunnel v0.0.0-20260912185055-f18c9fae41b1
 
 require (
 	github.com/google/uuid v1.6.0
-	github.com/sandertv/gophertunnel v1.59.0
+	github.com/sandertv/gophertunnel v1.61.0
 )
 
 require (
