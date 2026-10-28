@@ -165,6 +165,11 @@ func (p *Player) handleClientPacket(ctx *context.HandlePacketContext) {
 		p.worldUpdater.SetChunkRadius(pk.ChunkRadius + 4)
 	case *packet.InventoryTransaction:
 		if tr, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok {
+			// Leave unsupported or invalid hands to the backend without changing
+			// Oomph's main-hand inventory, consumption, or combat state.
+			if tr.Hand != protocol.HandSlotMainHand {
+				return
+			}
 			p.inventory.SetHeldSlot(int32(tr.HotBarSlot))
 			if tr.ActionType == protocol.UseItemOnEntityActionAttack && (p.GameMode == packet.GameTypeSurvival || p.GameMode == packet.GameTypeAdventure) {
 				// The reason we cancel here is because Oomph also utlizes a full-authoritative system for combat. We need to wait for the
@@ -224,6 +229,11 @@ func (p *Player) handleClientPacket(ctx *context.HandlePacketContext) {
 				}
 			}
 		} else if tr, ok := pk.TransactionData.(*protocol.ReleaseItemTransactionData); ok {
+			// Leave unsupported or invalid hands to the backend without changing
+			// Oomph's main-hand inventory, consumption, or combat state.
+			if tr.Hand != protocol.HandSlotMainHand {
+				return
+			}
 			p.inventory.SetHeldSlot(int32(tr.HotBarSlot))
 			p.StartUseConsumableTick = 0
 			//p.Message("released item")
