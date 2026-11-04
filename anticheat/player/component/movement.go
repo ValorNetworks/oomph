@@ -633,14 +633,8 @@ func (mc *AuthoritativeMovementComponent) JustDisabledFlight() bool {
 
 // Update updates the states of the movement component from the given input.
 func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) bool {
-	// Rebase position only; retain expected velocity and server impulse state.
-	// LastPos is advanced by simulation, not by adopting the current observation.
-	if mc.mPlayer.HasInteractionObservation() && !mc.HasTeleport() && !mc.Immobile() {
-		mc.pos = mc.mPlayer.LastInteractionPosition()
-		if grounded, known := mc.mPlayer.InteractionGroundedAt(mc.pos); known && !mc.flying {
-			mc.onGround = grounded
-		}
-	}
+	// Continue from the previous simulated position/velocity. Observed movement
+	// belongs to interaction tracking and must not restart prediction each input.
 	//assert.IsTrue(mc.mPlayer != nil, "parent player is null")
 	//assert.IsTrue(pk != nil, "given player input is nil")
 	//assert.IsTrue(mc.nonAuthoritative != nil, "non-authoritative data is null")

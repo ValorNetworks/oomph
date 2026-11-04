@@ -14,15 +14,16 @@ import (
 // movementObservation belongs to the serialized packet-processing path. It is
 // independent of prediction: predictions never replace forwarded client input.
 type movementObservation struct {
-	position, previous mgl32.Vec3
-	initialized        bool
-	teleportPending    bool
-	teleportPosition   mgl32.Vec3
-	comparison         MovementComparison
+	position, previous        mgl32.Vec3
+	initialized               bool
+	teleportPending           bool
+	teleportPosition          mgl32.Vec3
+	comparison                MovementComparison
+	predictionRebaseRequested bool
 }
 
-// MovementComparison preserves the just-completed prediction before the next
-// input rebases its starting position. It is evidence, not a legality verdict.
+// MovementComparison preserves prediction before any internal reconciliation.
+// It is evidence, not a legality verdict.
 type MovementComparison struct {
 	Frame                              uint64
 	ExpectedPosition, ExpectedVelocity mgl32.Vec3
@@ -33,6 +34,33 @@ type MovementComparison struct {
 // MovementComparison returns a value snapshot. Callers use the same processing
 // ownership as Movement(); it is not an asynchronous player-state API.
 func (p *Player) MovementComparison() MovementComparison { return p.interaction.comparison }
+
+// RequestPredictionRebase asks the serialized packet path to realign internal
+// position after all checks see this frame. It sends no packet and retains
+// expected velocity, server impulses, abilities and acknowledgement state.
+func (p *Player) RequestPredictionRebase(frame uint64) {
+	if comparison := p.interaction.comparison; comparison.Eligible && comparison.Frame == frame {
+		p.interaction.predictionRebaseRequested = true
+	}
+}
+
+func (p *Player) finishMovementPrediction() {
+	if !p.interaction.predictionRebaseRequested {
+		return
+	}
+	p.interaction.predictionRebaseRequested = false
+	if !p.interaction.comparison.Eligible || p.interaction.teleportPending ||
+		p.movement.HasTeleport() || p.movement.PendingTeleports() != 0 ||
+		p.movement.HasKnockback() || p.movement.Immobile() {
+		return
+	}
+	position := p.InteractionPosition()
+	p.movement.SetPos(position)
+	p.movement.SetSupportingBlockPos(nil)
+	if grounded, known := p.InteractionGroundedAt(position); known && !p.movement.Flying() {
+		p.movement.SetOnGround(grounded)
+	}
+}
 
 func (p *Player) resetInteractionMovement(pos mgl32.Vec3) {
 	p.interaction = movementObservation{position: pos, previous: pos, initialized: true}

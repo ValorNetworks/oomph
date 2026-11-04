@@ -299,6 +299,9 @@ func (p *Player) handleClientPacket(ctx *context.HandlePacketContext) {
 		}
 	}
 	p.RunDetections(pk)
+	if _, movement := pk.(*packet.PlayerAuthInput); movement {
+		p.finishMovementPrediction()
+	}
 }
 
 // splitCommandLine splits a command line into arguments, preserving quoted substrings

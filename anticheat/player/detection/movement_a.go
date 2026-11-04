@@ -3,7 +3,6 @@ package detection
 import (
 	"math"
 
-	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/anticheat/oconfig"
 	"github.com/oomph-ac/oomph/anticheat/player"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -14,7 +13,6 @@ import (
 type MovementA struct {
 	p        *player.Player
 	metadata player.DetectionMetadata
-	residual mgl32.Vec3
 }
 
 func New_MovementA(p *player.Player) *MovementA {
@@ -43,20 +41,16 @@ func (d *MovementA) Detect(pk packet.Packet) {
 	if threshold <= 0 || math.IsNaN(float64(threshold)) || math.IsInf(float64(threshold), 0) {
 		threshold = oconfig.DefaultConfig.Movement.PredictionThreshold
 	}
-	// Prediction rebases its position each input. Integrate signed displacement
-	// error so persistent sub-threshold speed changes are not erased by rebasing.
-	d.residual = d.residual.Add(comparison.ObservedPosition.Sub(comparison.ExpectedPosition))
-	if offset := d.residual.Len(); offset > threshold {
+	// The predicted position is continuous across inputs. Its distance from the
+	// reported position already represents deviation; do not sum that distance.
+	if offset := comparison.ObservedPosition.Sub(comparison.ExpectedPosition).Len(); offset > threshold {
 		d.p.FailDetection(d, "offset", offset, "threshold", threshold, "frame", comparison.Frame)
-		// A flag replaces the old correction boundary. Discard only detector
-		// evidence; expected velocity, observed input and gameplay stay intact.
-		d.residual = mgl32.Vec3{}
+		d.p.RequestPredictionRebase(comparison.Frame)
 	} else {
 		d.p.PassDetection(d, .25)
 	}
 }
 
 func (d *MovementA) ResetBackend() {
-	d.residual = mgl32.Vec3{}
 	d.metadata.Buffer = 0
 }

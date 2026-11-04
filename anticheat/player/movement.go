@@ -270,6 +270,7 @@ func (p *Player) Movement() MovementComponent {
 
 // handleMovement updates internal prediction without changing the client's input.
 func (p *Player) handleMovement(pk *packet.PlayerAuthInput) {
+	p.interaction.predictionRebaseRequested = false
 	// Capture the old correction exclusions before simulation consumes impulses.
 	exempt := !p.Ready || !p.Alive || p.movement.Immobile() ||
 		p.movement.HasTeleport() || p.movement.PendingTeleports() != 0 ||
@@ -278,7 +279,12 @@ func (p *Player) handleMovement(pk *packet.PlayerAuthInput) {
 	p.SimulationFrame = pk.Tick
 	p.ClientTick++
 	p.InputCount++
-	pos := p.InteractionPosition()
+	// Keep the geometry needed by continuous prediction until this input has
+	// been checked. An outlying reported position must not evict that geometry.
+	pos := p.movement.Pos()
+	if p.movement.HasTeleport() || p.movement.PendingTeleports() != 0 || p.interaction.teleportPending {
+		pos = p.InteractionPosition()
+	}
 	p.World().CleanChunks(p.WorldUpdater().ChunkRadius(), interactionChunk(pos))
 	p.effects.Tick()
 	simulated := p.movement.Update(pk)
