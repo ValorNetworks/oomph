@@ -3,7 +3,7 @@ package oconfig
 import "maps"
 
 const (
-	ConfigVersion          uint64 = 8
+	ConfigVersion          uint64 = 9
 	DefaultShutdownMessage        = "§cServer is restarting."
 )
 
@@ -70,6 +70,7 @@ var (
 		},
 
 		Movement: MovementOpts{
+			PredictionThreshold:       0.3,
 			LimitAllVelocity:          true,
 			LimitAllVelocityThreshold: 10.0,
 		},
@@ -97,6 +98,8 @@ var (
 		},
 
 		Detections: map[string]Detection{
+			"Movement_A": {MaxVl: 10, FlagMsg: "{prefix} {player} failed Movement A [{violations}]", Punishment: PunishmentTypeNone},
+			"Timer_A":    {MaxVl: 10, FlagMsg: "{prefix} {player} failed Timer A [{violations}]", Punishment: PunishmentTypeNone},
 			"Autoclicker_A": {
 				MaxVl:      25.0,
 				FlagMsg:    "{prefix} §e{player} §6is clicking too quickly §7[§cx{violations}§7]",

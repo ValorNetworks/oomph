@@ -632,7 +632,7 @@ func (mc *AuthoritativeMovementComponent) JustDisabledFlight() bool {
 }
 
 // Update updates the states of the movement component from the given input.
-func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
+func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) bool {
 	// Rebase position only; retain expected velocity and server impulse state.
 	// LastPos is advanced by simulation, not by adopting the current observation.
 	if !mc.HasTeleport() && !mc.Immobile() {
@@ -794,7 +794,7 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 	}
 
 	mc.impulse = impulse.Mul(0.98)
-	simulation.SimulatePlayerMovement(mc.mPlayer, mc)
+	simulated := simulation.SimulatePlayerMovement(mc.mPlayer, mc)
 
 	// On older versions, there seems to be a delay before the sprinting status is actually applied.
 	if !isNewVersionPlayer {
@@ -838,6 +838,7 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 		mc.jumpDelay--
 	}
 	mc.justDisabledFlight = false
+	return simulated
 }
 
 // ServerUpdate updates certain states of the movement component based on a packet sent by the remote server.

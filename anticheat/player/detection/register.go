@@ -3,6 +3,9 @@ package detection
 import "github.com/oomph-ac/oomph/anticheat/player"
 
 func Register(p *player.Player) {
+	p.RegisterDetection(New_MovementA(p))
+	p.RegisterDetection(New_TimerA(p))
+
 	// autoclicker detections
 	p.RegisterDetection(New_AutoclickerA(p))
 

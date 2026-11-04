@@ -19,10 +19,10 @@ import (
 )
 
 // SimulatePlayerMovement is a function that runs a movement simulation for
-func SimulatePlayerMovement(p *player.Player, movement player.MovementComponent) {
+func SimulatePlayerMovement(p *player.Player, movement player.MovementComponent) bool {
 	if movement == nil {
 		p.Disconnect(game.ErrorInternalMissingMovementComponent)
-		return
+		return false
 	}
 
 	//assert.IsTrue(movement != nil, "movement component should be non-nil for simulation")
@@ -37,23 +37,23 @@ func SimulatePlayerMovement(p *player.Player, movement player.MovementComponent)
 	// is "unreliable", or if the player currently is in an unloaded chunk.
 	if attemptTeleport(p, p.Dbg) {
 		p.Dbg.Notify(player.DebugModeMovementSim, true, "teleport (newPos=%v)", movement.Pos())
-		return
+		return false
 	}
 
 	if !simulationIsReliable(p, movement) {
 		p.Dbg.Notify(player.DebugModeMovementSim, true, "no movement sim for frame %d: unsupported scenario", p.SimulationFrame)
 		movement.Reset()
-		return
-	} else if p.World().Chunk(protocol.ChunkPos{int32(movement.Pos().X()) >> 4, int32(movement.Pos().Z()) >> 4}) == nil {
+		return false
+	} else if p.World().Chunk(protocol.ChunkPos{int32(math.Floor(float64(movement.Pos().X()))) >> 4, int32(math.Floor(float64(movement.Pos().Z()))) >> 4}) == nil {
 		p.Dbg.Notify(player.DebugModeMovementSim, true, "no movement sim for frame %d: in unloaded chunk, cancelling all movement", p.SimulationFrame)
 		movement.SetVel(mgl32.Vec3{})
-		return
+		return false
 	}
 
 	if movement.Immobile() || !p.Ready {
 		p.Dbg.Notify(player.DebugModeMovementSim, true, "player is immobile")
 		movement.SetVel(mgl32.Vec3{})
-		return
+		return false
 	}
 
 	// Reset the velocity to zero if it's significantly small.
@@ -79,7 +79,7 @@ func SimulatePlayerMovement(p *player.Player, movement player.MovementComponent)
 			movement.SetOnGround(false)
 			simulateGlide(p, movement)
 			movement.SetMov(movement.Vel())
-			return
+			return true
 		}
 
 		movement.SetGliding(false)
@@ -175,6 +175,7 @@ func SimulatePlayerMovement(p *player.Player, movement player.MovementComponent)
 	movement.SetVel(newVel)
 	p.Dbg.Notify(player.DebugModeMovementSim, true, "endOfFrameVel=%v", newVel)
 	p.Dbg.Notify(player.DebugModeMovementSim, true, "serverPos=%v clientPos=%v, diff=%v", movement.Pos(), movement.Client().Pos(), movement.Pos().Sub(movement.Client().Pos()))
+	return true
 }
 
 func simulateGlide(p *player.Player, movement player.MovementComponent) {

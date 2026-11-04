@@ -1,6 +1,8 @@
 package oconfig
 
 type MovementOpts struct {
+	// PredictionThreshold raises a flag; it never controls movement correction.
+	PredictionThreshold float32 `json:"prediction_threshold" comment:"Accumulated supported prediction error in blocks required to flag Movement A. No movement correction is performed."`
 	// LimitAllVelocity is a boolean that represents if the Oomph proxy should limit the prediction velocity to a certain limit. This prevents exploiters from setting a large
 	// velocity value when exempted to cause crashes or lag.
 	LimitAllVelocity bool `json:"limit_all_velocity" comment:"Should Oomph limit the prediction velocity to a certain limit? This prevents exploiters from setting a large velocity value when exempted to cause crashes or lag."`

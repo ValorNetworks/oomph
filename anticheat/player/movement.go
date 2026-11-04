@@ -230,7 +230,7 @@ type MovementComponent interface {
 	JustDisabledFlight() bool
 
 	// Update updates the states of the movement component from the given input.
-	Update(input *packet.PlayerAuthInput)
+	Update(input *packet.PlayerAuthInput) bool
 	// ServerUpdate updates certain states of the movement component based on a packet sent by the remote server.
 	ServerUpdate(pk packet.Packet)
 
@@ -270,15 +270,21 @@ func (p *Player) Movement() MovementComponent {
 
 // handleMovement updates internal prediction without changing the client's input.
 func (p *Player) handleMovement(pk *packet.PlayerAuthInput) {
+	// Capture the old correction exclusions before simulation consumes impulses.
+	exempt := !p.Ready || !p.Alive || p.movement.Immobile() ||
+		p.movement.HasTeleport() || p.movement.PendingTeleports() != 0 ||
+		p.interaction.teleportPending || p.movement.HasKnockback() ||
+		pk.InputData.Load(packet.InputFlagJumpPressedRaw)
 	p.SimulationFrame = pk.Tick
 	p.ClientTick++
 	p.InputCount++
 	pos := p.InteractionPosition()
 	p.World().CleanChunks(p.WorldUpdater().ChunkRadius(), interactionChunk(pos))
 	p.effects.Tick()
-	p.movement.Update(pk)
+	simulated := p.movement.Update(pk)
 	p.interaction.comparison = MovementComparison{
 		Frame: pk.Tick, ExpectedPosition: p.movement.Pos(), ExpectedVelocity: p.movement.Vel(),
 		ObservedPosition: p.movement.Client().Pos(), ObservedVelocity: p.movement.Client().Vel(),
+		Eligible: simulated && !exempt,
 	}
 }

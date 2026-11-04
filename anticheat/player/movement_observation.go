@@ -27,6 +27,7 @@ type MovementComparison struct {
 	Frame                              uint64
 	ExpectedPosition, ExpectedVelocity mgl32.Vec3
 	ObservedPosition, ObservedVelocity mgl32.Vec3
+	Eligible                           bool
 }
 
 // MovementComparison returns a value snapshot. Callers use the same processing

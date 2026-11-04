@@ -11,4 +11,6 @@ const (
 	TypeNuker        = "Nuker"
 	TypeReach        = "Reach"
 	TypeHitbox       = "Hitbox"
+	TypeMovement     = "Movement"
+	TypeTimer        = "Timer"
 )

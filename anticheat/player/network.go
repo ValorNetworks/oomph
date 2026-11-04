@@ -67,6 +67,11 @@ func (p *Player) SetServerConn(conn ServerConn) {
 	p.acks.ResetTransferState()
 	p.movement.ResetTransferState(p.GameDat.PlayerPosition)
 	p.resetInteractionMovement(p.GameDat.PlayerPosition)
+	for _, detection := range p.detections {
+		if reset, ok := detection.(interface{ ResetBackend() }); ok {
+			reset.ResetBackend()
+		}
+	}
 }
 
 // BlockNetwork returns the codec shared by the client and every backend in this session.
