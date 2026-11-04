@@ -11,6 +11,7 @@ import (
 	dfworld "github.com/df-mc/dragonfly/server/world"
 	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/oomph-ac/oomph/anticheat/entity"
 	"github.com/oomph-ac/oomph/anticheat/player"
 	packetcontext "github.com/oomph-ac/oomph/anticheat/player/context"
 	oworld "github.com/oomph-ac/oomph/anticheat/world"
@@ -138,5 +139,39 @@ func TestMiningGroundContextUsesObservedSupport(t *testing.T) {
 	observationInput(t, p, 2, mgl32.Vec3{2, 65, 2})
 	if p.InteractionOnGround() {
 		t.Fatal("actual rising movement was treated as grounded")
+	}
+}
+
+func TestClientCombatMeasurementsAreIndependentOfPredictedPosition(t *testing.T) {
+	p, m := observationPlayer(t)
+	observationInput(t, p, 1, mgl32.Vec3{2, 64, 2})
+	target := entity.New(entity.Config{RuntimeID: 2, UniqueID: 2, Type: entity.TypePlayer,
+		NetworkPosition: mgl32.Vec3{2, 65.62001, 4.8}, Width: .6, Height: 1.8, Scale: 1, IsPlayer: true})
+	p.ClientEntityTracker().AddEntity(2, target)
+	var minimum []float32
+	p.ClientCombat().Hook(func(c player.CombatComponent) {
+		value := float32(1e6)
+		for _, distance := range c.Raws() {
+			if distance < value {
+				value = distance
+			}
+		}
+		minimum = append(minimum, value)
+	})
+	attack := func() {
+		p.ClientCombat().Attack(&packet.InventoryTransaction{TransactionData: &protocol.UseItemOnEntityTransactionData{
+			TargetEntityRuntimeID: 2, ActionType: protocol.UseItemOnEntityActionAttack}})
+		p.ClientCombat().Calculate()
+	}
+	attack()
+	m.SetPos(mgl32.Vec3{100, 90, 100})
+	attack()
+	if len(minimum) != 2 || minimum[0] > 3 || minimum[0] != minimum[1] {
+		t.Fatalf("same client scene changed with internal prediction: %v", minimum)
+	}
+	target.Position, target.PrevPosition = mgl32.Vec3{2, 64, 10}, mgl32.Vec3{2, 64, 10}
+	attack()
+	if len(minimum) != 3 || minimum[2] < 5 {
+		t.Fatalf("distant target wasn't distinguished: %v", minimum)
 	}
 }
