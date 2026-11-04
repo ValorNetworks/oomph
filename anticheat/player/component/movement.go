@@ -635,7 +635,7 @@ func (mc *AuthoritativeMovementComponent) JustDisabledFlight() bool {
 func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) bool {
 	// Rebase position only; retain expected velocity and server impulse state.
 	// LastPos is advanced by simulation, not by adopting the current observation.
-	if !mc.HasTeleport() && !mc.Immobile() {
+	if mc.mPlayer.HasInteractionObservation() && !mc.HasTeleport() && !mc.Immobile() {
 		mc.pos = mc.mPlayer.LastInteractionPosition()
 		if grounded, known := mc.mPlayer.InteractionGroundedAt(mc.pos); known && !mc.flying {
 			mc.onGround = grounded

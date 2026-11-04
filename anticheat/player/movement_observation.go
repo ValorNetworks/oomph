@@ -59,7 +59,7 @@ func (p *Player) observeInteractionMovement(input *packet.PlayerAuthInput) bool 
 	position := input.Position.Sub(mgl32.Vec3{0, game.DefaultPlayerHeightOffset, 0})
 	state := &p.interaction
 	if !state.initialized {
-		p.resetInteractionMovement(position)
+		p.resetInteractionMovement(p.movement.Pos())
 	}
 	if state.teleportPending {
 		if position.Sub(state.teleportPosition).Len() > 1 {
@@ -76,6 +76,8 @@ func (p *Player) observeInteractionMovement(input *packet.PlayerAuthInput) bool 
 
 // InteractionPosition is the observed backend-input position, fenced by actual
 // server moves/immobility. It does not assert that DF accepted every core event.
+func (p *Player) HasInteractionObservation() bool { return p.interaction.initialized }
+
 func (p *Player) InteractionPosition() mgl32.Vec3 {
 	if p.interaction.initialized {
 		return p.interaction.position

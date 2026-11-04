@@ -72,6 +72,29 @@ func observationInput(t *testing.T, p *player.Player, frame uint64, pos mgl32.Ve
 	return input
 }
 
+func TestDirectPredictionKeepsItsOriginWithoutClientObservations(t *testing.T) {
+	p, m := observationPlayer(t)
+	if p.HasInteractionObservation() {
+		t.Fatal("fixture unexpectedly observed input")
+	}
+	input := &packet.PlayerAuthInput{MoveVector: mgl32.Vec2{0, 1}, InputData: protocol.NewInputFlags(packet.InputFlagCount)}
+	for range 5 {
+		m.Update(input)
+	}
+	if m.Pos().Z() <= 2.2 || m.Pos().Y() < 63.99 {
+		t.Fatalf("direct simulation lost its origin: %v", m.Pos())
+	}
+}
+
+func TestFirstObservationDoesNotHideTheFirstDisplacement(t *testing.T) {
+	p, _ := observationPlayer(t)
+	observationInput(t, p, 1, mgl32.Vec3{2.2, 64, 2})
+	c := p.MovementComparison()
+	if c.ObservedPosition.Sub(c.ExpectedPosition).X() < .19 {
+		t.Fatalf("first displacement disappeared: %+v", c)
+	}
+}
+
 func TestMovementKeepsOriginalInputAndRunsChecksDuringBurst(t *testing.T) {
 	p, _ := observationPlayer(t)
 	check := new(observationCheck)
