@@ -64,9 +64,9 @@ func (p *Player) SetServerConn(conn ServerConn) {
 		p.GameMode = conn.GameData().WorldGameMode
 	}
 
-	p.PendingCorrectionACK = false
 	p.acks.ResetTransferState()
 	p.movement.ResetTransferState(p.GameDat.PlayerPosition)
+	p.resetInteractionMovement(p.GameDat.PlayerPosition)
 }
 
 // BlockNetwork returns the codec shared by the client and every backend in this session.

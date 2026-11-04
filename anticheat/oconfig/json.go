@@ -78,6 +78,7 @@ func ParseJSON(file string) error {
 		if writeErr := writeMigratedJSON(file, data, parsedCfg); writeErr != nil {
 			return fmt.Errorf("unable to update config file: %w", writeErr)
 		}
+		Global = parsedCfg
 		return ErrConfigUpdated
 	}
 
@@ -106,6 +107,15 @@ func writeMigratedJSON(file string, original []byte, cfg Config) error {
 	}
 	if _, _, err := existing.DeleteKey("spectrum_api_token"); err != nil {
 		return fmt.Errorf("unable to remove Spectrum config: %w", err)
+	}
+	if value, found := existing.Value.(*hjson.OrderedMap).AtKey("movement_opts"); found {
+		if node, ok := value.(*hjson.Node); ok {
+			for _, key := range []string{"correction_threshold", "persuasion_threshold", "accept_client_position", "position_acception_threshold", "accept_client_velocity", "velocity_acception_threshold"} {
+				if _, _, err := node.DeleteKey(key); err != nil {
+					return fmt.Errorf("remove obsolete movement option %s: %w", key, err)
+				}
+			}
+		}
 	}
 	return writeValue(file, existing)
 }

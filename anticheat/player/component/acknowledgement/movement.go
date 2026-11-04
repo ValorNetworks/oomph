@@ -202,23 +202,3 @@ func (ack *Knockback) Tick() {
 		ack.Run()
 	}
 }
-
-// MovementCorrection is an acknowledgment that is ran whenever the player receives a movement correction from the server.
-type MovementCorrection struct {
-	mPlayer  *player.Player
-	setField bool
-}
-
-func NewMovementCorrectionACK(p *player.Player) *MovementCorrection {
-	return &MovementCorrection{
-		mPlayer:  p,
-		setField: !p.PendingCorrectionACK,
-	}
-}
-
-func (ack *MovementCorrection) Run() {
-	ack.mPlayer.Movement().RemovePendingCorrection()
-	if ack.setField {
-		ack.mPlayer.PendingCorrectionACK = false
-	}
-}

@@ -3,9 +3,6 @@ package player
 import (
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
-	"github.com/oomph-ac/oomph/anticheat/game"
-	"github.com/oomph-ac/oomph/anticheat/utils"
-	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
@@ -13,11 +10,6 @@ import (
 // It is used for updating movement states of the player, and providing them to any other
 // component that requires it.
 type MovementComponent interface {
-	// InputAcceptable returns true if the input is within the rate-limit Oomph has imposed for the player.
-	InputAcceptable() bool
-	// Tick runs on the server tick that updates acceptable input limits for the player.
-	Tick(elapsedTicks int64)
-
 	// Client returns the non-authoritative client movement sent to the server.
 	Client() NonAuthoritativeMovementInfo
 
@@ -244,21 +236,7 @@ type MovementComponent interface {
 
 	// Reset is a function that resets the current movement of the movement component to the client's non-authoritative movement.
 	Reset()
-
-	// PendingCorrections is the amount of corrections sent to the client that is still pending from the server.
-	PendingCorrections() int
-	// AddPendingCorrection adds a pending correction to the movement component.
-	AddPendingCorrection()
-	// RemovePendingCorrection removes a pending correction from the movement component.
-	RemovePendingCorrection()
-	// InCorrectionCooldown returns true if the client has synced back with the server for at least one tick after a correction.
-	InCorrectionCooldown() bool
-	// SetCorrectionCooldown sets whether the client has synced back with the server for at least one tick after a correction.
-	SetCorrectionCooldown(bool)
-
-	// Sync sends a correction to the client to re-sync the client's movement with the server's.
-	Sync()
-	// ResetTransferState clears movement state that must not survive a fast transfer.
+	// ResetTransferState clears movement information belonging to an old backend.
 	ResetTransferState(pos mgl32.Vec3)
 }
 
@@ -290,97 +268,17 @@ func (p *Player) Movement() MovementComponent {
 	return p.movement
 }
 
+// handleMovement updates internal prediction without changing the client's input.
 func (p *Player) handleMovement(pk *packet.PlayerAuthInput) {
 	p.SimulationFrame = pk.Tick
 	p.ClientTick++
 	p.InputCount++
-
-	hasTeleport := p.movement.HasTeleport()
-	hasKnockback := p.movement.HasKnockback()
-
-	p.World().CleanChunks(p.WorldUpdater().ChunkRadius(), protocol.ChunkPos{
-		int32(p.movement.Pos().X()) >> 4,
-		int32(p.movement.Pos().Z()) >> 4,
-	})
+	pos := p.InteractionPosition()
+	p.World().CleanChunks(p.WorldUpdater().ChunkRadius(), interactionChunk(pos))
 	p.effects.Tick()
-	p.Dbg.StartMovementSimBuffer()
 	p.movement.Update(pk)
-
-	// If the client's prediction of movement deviates from the server, we send a correction so that the client can re-sync.
-	posDiff := p.movement.Pos().Sub(p.movement.Client().Pos())
-	velDiff := p.movement.Vel().Sub(p.movement.Client().Vel())
-
-	needsCorrection := posDiff.Len() > p.Opts().Movement.CorrectionThreshold
-	if needsCorrection && p.movement.PendingTeleports() == 0 && !hasTeleport &&
-		!pk.InputData.Load(packet.InputFlagJumpPressedRaw) && !hasKnockback {
-		p.movement.Sync()
-	} else if !needsCorrection && !hasTeleport && !hasKnockback && p.movement.PendingCorrections() == 0 {
-		inCooldown := p.movement.InCorrectionCooldown()
-		p.movement.SetCorrectionCooldown(false)
-
-		// We can only accept the client's position/velocity if we are not in a cooldown period (and it is specified in the config).
-		srvInsideBlocks, clientInsideBlocks := utils.HasNearbyBBoxes(p.movement.BoundingBox(), p.World()), utils.HasNearbyBBoxes(p.movement.ClientBoundingBox(), p.World())
-		if !inCooldown && p.movement.PendingTeleports() == 0 && !hasTeleport && !p.movement.Immobile() && srvInsideBlocks == clientInsideBlocks {
-			if p.Opts().Movement.AcceptClientPosition && posDiff.Len() < p.Opts().Movement.PositionAcceptanceThreshold {
-				posDiff = mgl32.Vec3{}
-				p.movement.SetPos(p.movement.Client().Pos())
-				p.Dbg.Notify(
-					DebugModeMovementSim,
-					true,
-					"accepted client position (newPos=%v)",
-					p.movement.Pos(),
-				)
-			}
-			if p.Opts().Movement.AcceptClientVelocity && velDiff.Len() < p.Opts().Movement.VelocityAcceptanceThreshold {
-				p.movement.SetVel(p.movement.Client().Vel())
-				p.Dbg.Notify(
-					DebugModeMovementSim,
-					true,
-					"accepted client velocity (newVel=%v)",
-					p.movement.Vel(),
-				)
-			}
-
-			// Attempt to shift the server's position slowly towards the client's if the client has the same velocity
-			// as the server. This is to prevent sudden unexpected rubberbanding (mainly from collisions) that may occur if
-			// the client and server position is desynced consistently without going above the correction threshold.
-			if p.Opts().Movement.PersuasionThreshold > 0 {
-				threshold := p.Opts().Movement.PersuasionThreshold
-				posDiff[0] = game.ClampFloat(posDiff[0], -threshold, threshold)
-				posDiff[1] = 0
-				posDiff[2] = game.ClampFloat(posDiff[2], -threshold, threshold)
-
-				p.movement.SetPos(p.movement.Pos().Sub(posDiff))
-				p.Dbg.Notify(
-					DebugModeMovementSim,
-					posDiff.Len() >= 5e-4,
-					"shifted server position by %v (newPos=%v diff=%v)",
-					posDiff,
-					p.movement.Pos(),
-					p.movement.Pos().Sub(p.movement.Client().Pos()),
-				)
-			}
-		}
+	p.interaction.comparison = MovementComparison{
+		Frame: pk.Tick, ExpectedPosition: p.movement.Pos(), ExpectedVelocity: p.movement.Vel(),
+		ObservedPosition: p.movement.Client().Pos(), ObservedVelocity: p.movement.Client().Vel(),
 	}
-
-	if p.movement.PendingCorrections() > 0 {
-		p.Dbg.FlushMovementSimBuffer()
-	} else {
-		p.Dbg.DiscardMovementSimBuffer()
-	}
-
-	// To prevent the server never accepting our position (PMMP), we will always set our position to the final teleport position if a teleport is in progress.
-	// Otherwise, we will use the movement component's prediction.
-	var finalPos mgl32.Vec3
-	if p.Movement().PendingTeleports() > 0 {
-		finalPos = p.Movement().PendingTeleportPos()
-	} else {
-		finalPos = p.Movement().Pos()
-	}
-
-	// Update the position given in this packet to what the server predicts is correct. This is used so that there isn't any weird
-	// rubberbanding that is visible on the POVs of the other players if corrections are sent. This also implies the fact that
-	// other players will be unable to see if another client is using a cheat to modify their movement (e.g - fly). Of course, that is
-	// granted that the movement scenario is supported by Oomph.
-	pk.Position = finalPos.Add(mgl32.Vec3{0, game.DefaultPlayerHeightOffset + 0.001})
 }

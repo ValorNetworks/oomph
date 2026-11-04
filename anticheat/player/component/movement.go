@@ -5,7 +5,6 @@ import (
 
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
-	"github.com/oomph-ac/oomph/anticheat/entity"
 	"github.com/oomph-ac/oomph/anticheat/game"
 	"github.com/oomph-ac/oomph/anticheat/player"
 	"github.com/oomph-ac/oomph/anticheat/player/component/acknowledgement"
@@ -128,12 +127,6 @@ type AuthoritativeMovementComponent struct {
 
 	flying, mayFly, trustFlyStatus bool
 	justDisabledFlight             bool
-
-	allowedInputs int64
-	hasFirstInput bool
-
-	pendingCorrections   int
-	inCorrectionCooldown bool
 }
 
 func NewAuthoritativeMovementComponent(p *player.Player) *AuthoritativeMovementComponent {
@@ -142,50 +135,6 @@ func NewAuthoritativeMovementComponent(p *player.Player) *AuthoritativeMovementC
 		nonAuthoritative:     &NonAuthoritativeMovement{},
 		defaultMovementSpeed: 0.1,
 		airSpeed:             0.02,
-	}
-}
-
-// InputAcceptable returns true if the input is within the rate-limit Oomph has imposed for the player.
-func (mc *AuthoritativeMovementComponent) InputAcceptable() bool {
-	if !mc.hasFirstInput {
-		mc.hasFirstInput = true
-	}
-
-	if mc.allowedInputs <= 0 {
-		mc.mPlayer.Dbg.Notify(player.DebugModeTimer, true, "no allowed inputs remaining (cT=%d sT=%d)", mc.mPlayer.SimulationFrame, mc.mPlayer.ServerTick)
-		return false
-	}
-	mc.mPlayer.Dbg.Notify(player.DebugModeTimer, true, "allowed inputs remaining: %d (cT=%d sT=%d)", mc.allowedInputs, mc.mPlayer.SimulationFrame, mc.mPlayer.ServerTick)
-	mc.allowedInputs--
-	return true
-}
-
-func (mc *AuthoritativeMovementComponent) Tick(elapsedTicks int64) {
-	if !mc.hasFirstInput {
-		mc.allowedInputs = 65535
-		return
-	}
-
-	latencyAllowance := mc.mPlayer.ServerTick - mc.mPlayer.ClientTick
-	if latencyAllowance < 0 {
-		latencyAllowance = 0
-	}
-	latencyAllowance += elapsedTicks
-	defaultAllowance := mc.allowedInputs
-	if defaultAllowance < 0 {
-		defaultAllowance = 0
-	}
-	defaultAllowance += elapsedTicks
-
-	if latencyAllowance < defaultAllowance {
-		mc.allowedInputs = latencyAllowance
-	} else {
-		mc.allowedInputs = defaultAllowance
-	}
-
-	// We must always accept one player input for every server tick.
-	if mc.allowedInputs < 1 {
-		mc.allowedInputs = 1
 	}
 }
 
@@ -684,6 +633,14 @@ func (mc *AuthoritativeMovementComponent) JustDisabledFlight() bool {
 
 // Update updates the states of the movement component from the given input.
 func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
+	// Rebase position only; retain expected velocity and server impulse state.
+	// LastPos is advanced by simulation, not by adopting the current observation.
+	if !mc.HasTeleport() && !mc.Immobile() {
+		mc.pos = mc.mPlayer.LastInteractionPosition()
+		if grounded, known := mc.mPlayer.InteractionGroundedAt(mc.pos); known && !mc.flying {
+			mc.onGround = grounded
+		}
+	}
 	//assert.IsTrue(mc.mPlayer != nil, "parent player is null")
 	//assert.IsTrue(pk != nil, "given player input is nil")
 	//assert.IsTrue(mc.nonAuthoritative != nil, "non-authoritative data is null")
@@ -808,8 +765,7 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 	if mc.sneaking {
 		maxImpulse *= game.MaxSneakImpulse
 	}
-	pk.MoveVector[0] = game.ClampFloat(pk.MoveVector[0], -maxImpulse, maxImpulse)
-	pk.MoveVector[1] = game.ClampFloat(pk.MoveVector[1], -maxImpulse, maxImpulse)
+	impulse := mgl32.Vec2{game.ClampFloat(pk.MoveVector[0], -maxImpulse, maxImpulse), game.ClampFloat(pk.MoveVector[1], -maxImpulse, maxImpulse)}
 
 	mc.jumping = pk.InputData.Load(packet.InputFlagStartJumping)
 	mc.pressingJump = pk.InputData.Load(packet.InputFlagJumping)
@@ -837,7 +793,7 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 		mc.gliding = true
 	}
 
-	mc.impulse = pk.MoveVector.Mul(0.98)
+	mc.impulse = impulse.Mul(0.98)
 	simulation.SimulatePlayerMovement(mc.mPlayer, mc)
 
 	// On older versions, there seems to be a delay before the sprinting status is actually applied.
@@ -899,6 +855,7 @@ func (mc *AuthoritativeMovementComponent) ServerUpdate(pk packet.Packet) {
 		}
 	case *packet.MoveActorAbsolute:
 		if utils.HasFlag(uint64(pk.Flags), packet.MoveFlagTeleport) {
+			mc.mPlayer.ObserveServerTeleport(pk.Position)
 			mc.SetPendingTeleportPos(pk.Position)
 			mc.AddPendingTeleport()
 			mc.mPlayer.ACKs().Add(acknowledgement.NewTeleportPlayerACK(mc.mPlayer, pk.Position, utils.HasFlag(uint64(pk.Flags), packet.MoveFlagOnGround), false))
@@ -910,6 +867,7 @@ func (mc *AuthoritativeMovementComponent) ServerUpdate(pk packet.Packet) {
 			}
 
 			tpPos := pk.Position.Sub(playerHeightOffset)
+			mc.mPlayer.ObserveServerTeleport(tpPos)
 			mc.SetPendingTeleportPos(tpPos)
 			mc.AddPendingTeleport()
 			mc.mPlayer.ACKs().Add(acknowledgement.NewTeleportPlayerACK(mc.mPlayer, tpPos, pk.OnGround, pk.Mode == packet.MoveModeNormal))
@@ -958,88 +916,6 @@ func (mc *AuthoritativeMovementComponent) Reset() {
 		mc.vel[0] = game.ClampFloat(mc.vel[0], -limitThreshold, limitThreshold)
 		mc.vel[1] = game.ClampFloat(mc.vel[1], -limitThreshold, limitThreshold)
 		mc.vel[2] = game.ClampFloat(mc.vel[2], -limitThreshold, limitThreshold)
-	}
-}
-
-// PendingCorrections returns the number of pending corrections the movement component has.
-func (mc *AuthoritativeMovementComponent) PendingCorrections() int {
-	return mc.pendingCorrections
-}
-
-// AddPendingCorrection increments the number of pending corrections the movement component has.
-func (mc *AuthoritativeMovementComponent) AddPendingCorrection() {
-	mc.pendingCorrections++
-}
-
-// RemovePendingCorrection decrements the number of pending corrections the movement component has.
-func (mc *AuthoritativeMovementComponent) RemovePendingCorrection() {
-	mc.pendingCorrections--
-}
-
-// InCorrectionCooldown returns true if the movement component is in a correction cooldown.
-func (mc *AuthoritativeMovementComponent) InCorrectionCooldown() bool {
-	return mc.inCorrectionCooldown
-}
-
-// SetCorrectionCooldown sets whether the movement component is in a correction cooldown.
-func (mc *AuthoritativeMovementComponent) SetCorrectionCooldown(cooldown bool) {
-	mc.inCorrectionCooldown = cooldown
-}
-
-func (mc *AuthoritativeMovementComponent) Sync() {
-	if mc.mPlayer.MState.IsReplay {
-		return
-	}
-
-	mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, true, "correcting movement for simulation frame %d", mc.mPlayer.SimulationFrame)
-	if mc.mPlayer.Dbg.Enabled(player.DebugModeMovementSim) {
-		mc.mPlayer.Message("correcting movement for simulation frame %d", mc.mPlayer.SimulationFrame)
-	}
-
-	mc.AddPendingCorrection()
-	mc.SetCorrectionCooldown(true)
-	mc.mPlayer.ACKs().Add(acknowledgement.NewMovementCorrectionACK(mc.mPlayer))
-	// Update the blocks in the world so the client can sync itself properly. We only want to update blocks that have the potential to affect the player's movement
-	// (the ones they are colliding with).
-	mc.mPlayer.SyncWorld()
-
-	if !mc.mPlayer.PendingCorrectionACK {
-		// Make sure all of the player's actor data is up-to-date with Oomph's prediction.
-		actorData := mc.mPlayer.LastSetActorData
-		if actorData == nil {
-			return
-		}
-		actorData.Tick = mc.mPlayer.SimulationFrame
-		if f, ok := actorData.EntityMetadata[entity.DataKeyFlags]; ok {
-			flags := f.(int64)
-			if mc.sprinting {
-				flags = utils.AddFlag(flags, entity.DataFlagSprinting)
-			} else {
-				flags = utils.RemoveFlag(flags, entity.DataFlagSprinting)
-			}
-			if mc.sneaking {
-				flags = utils.AddFlag(flags, entity.DataFlagSneaking)
-			} else {
-				flags = utils.RemoveFlag(flags, entity.DataFlagSneaking)
-			}
-			if mc.immobile {
-				flags = utils.AddFlag(flags, entity.DataFlagImmobile)
-			} else {
-				flags = utils.RemoveFlag(flags, entity.DataFlagImmobile)
-			}
-			actorData.EntityMetadata[entity.DataKeyFlags] = flags
-		}
-		mc.mPlayer.SendPacketToClient(actorData)
-
-		// Send the actual movement correction to the client.
-		mc.mPlayer.SendPacketToClient(&packet.CorrectPlayerMovePrediction{
-			PredictionType: packet.PredictionTypePlayer,
-			Position:       mc.Pos().Add(mgl32.Vec3{0, 1.621}),
-			Delta:          mc.Vel(),
-			OnGround:       mc.OnGround(),
-			Tick:           mc.mPlayer.SimulationFrame,
-		})
-		mc.mPlayer.PendingCorrectionACK = true
 	}
 }
 
@@ -1116,9 +992,4 @@ func (mc *AuthoritativeMovementComponent) ResetTransferState(pos mgl32.Vec3) {
 	mc.trustFlyStatus = false
 	mc.justDisabledFlight = false
 
-	mc.allowedInputs = 65535
-	mc.hasFirstInput = false
-
-	mc.pendingCorrections = 0
-	mc.inCorrectionCooldown = false
 }

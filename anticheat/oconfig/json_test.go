@@ -72,7 +72,7 @@ func TestParseRawJSONMigratesVersionFiveWithoutLosingValues(t *testing.T) {
 	if cfg.GCPercent != 37 || cfg.MemThreshold != 2048 {
 		t.Fatalf("runtime values were not preserved: GC=%d memory=%d", cfg.GCPercent, cfg.MemThreshold)
 	}
-	if cfg.Movement.CorrectionThreshold != 0.75 || cfg.Movement.LimitAllVelocityThreshold != 12 {
+	if cfg.Movement.LimitAllVelocityThreshold != 12 {
 		t.Fatalf("movement values were not preserved: %#v", cfg.Movement)
 	}
 	if got := cfg.Detections["Reach_A"]; got.MaxVl != 42 || got.FlagMsg != "custom-message" || got.Punishment != PunishmentTypeKick {
@@ -85,7 +85,7 @@ func TestParseRawJSONMigratesVersionFiveWithoutLosingValues(t *testing.T) {
 
 func TestParseRawJSONRejectsNewerConfigVersion(t *testing.T) {
 	_, err := ParseRawJSON([]byte(`{
-		version: 8
+		version: 9
 		prefix: future-prefix
 	}`))
 	if !errors.Is(err, ErrConfigTooNew) {
@@ -127,7 +127,7 @@ func TestParseRawJSONVersionZeroDoesNotShareDefaultDetections(t *testing.T) {
 func TestParseJSONDoesNotRewriteNewerConfig(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "oomph.hjson")
 	original := []byte(`{
-		version: 8
+		version: 9
 		future_setting: keep-me
 	}`)
 	if err := os.WriteFile(path, original, 0o600); err != nil {
@@ -204,7 +204,7 @@ func TestParseJSONSetsGlobalForCurrentConfig(t *testing.T) {
 func TestParseJSONLeavesCurrentConfigFileUnchanged(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "oomph.hjson")
 	original := []byte(`{
-		version: 7
+		version: 8
 		prefix: current-prefix
 		third_party_setting: keep-me
 		# preserve this comment and formatting

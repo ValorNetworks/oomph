@@ -3,7 +3,7 @@ package oconfig
 import "maps"
 
 const (
-	ConfigVersion          uint64 = 7
+	ConfigVersion          uint64 = 8
 	DefaultShutdownMessage        = "§cServer is restarting."
 )
 
@@ -70,14 +70,8 @@ var (
 		},
 
 		Movement: MovementOpts{
-			CorrectionThreshold:         0.3,
-			PersuasionThreshold:         0.002,
-			AcceptClientPosition:        false,
-			PositionAcceptanceThreshold: 0.09,
-			AcceptClientVelocity:        false,
-			VelocityAcceptanceThreshold: 0.03,
-			LimitAllVelocity:            true,
-			LimitAllVelocityThreshold:   10.0,
+			LimitAllVelocity:          true,
+			LimitAllVelocityThreshold: 10.0,
 		},
 
 		Combat: CombatOpts{

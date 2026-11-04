@@ -2,8 +2,6 @@ package player
 
 import (
 	"fmt"
-
-	"github.com/oomph-ac/oomph/anticheat/utils"
 )
 
 const (
@@ -65,18 +63,9 @@ var (
 	}
 )
 
-// movSimHistoryTicks is the maximum amount of ticks of movement sim debug logs that are retained.
-const movSimHistoryTicks = 10
-
 type Debugger struct {
 	Modes       map[int]bool
 	LoggingType byte
-
-	movSimBuf []string
-	// movSimHistory holds the logs of the last movSimHistoryTicks ticks. Slots that hold no
-	// logs are nil.
-	movSimHistory   *utils.CircularQueue[[]string]
-	bufferingMovSim bool
 
 	target *Player
 }
@@ -85,8 +74,6 @@ func NewDebugger(t *Player) *Debugger {
 	d := &Debugger{
 		Modes:       make(map[int]bool),
 		LoggingType: LoggingTypeLogFile,
-
-		movSimHistory: utils.NewCircularQueue[[]string](movSimHistoryTicks, nil),
 
 		target: t,
 	}
@@ -122,11 +109,6 @@ func (d *Debugger) Notify(mode int, cond bool, msg string, args ...interface{}) 
 	}
 
 	formatted := fmt.Sprintf(msg, args...)
-	if mode == DebugModeMovementSim && d.bufferingMovSim {
-		d.movSimBuf = append(d.movSimBuf, formatted)
-		return
-	}
-
 	d.writeDebug(mode, formatted)
 }
 
@@ -137,59 +119,4 @@ func (d *Debugger) writeDebug(mode int, msg string) {
 	default:
 		d.target.Message("%s", "["+DebugModeList[mode]+"]: "+msg)
 	}
-}
-
-// StartMovementSimBuffer begins buffering movement sim debug logs instead of writing them immediately.
-func (d *Debugger) StartMovementSimBuffer() {
-	d.movSimBuf = d.movSimBuf[:0]
-	d.bufferingMovSim = true
-}
-
-// FlushMovementSimBuffer writes the retained movement sim logs of previous ticks, then the logs of
-// the current tick, and ends buffering. The retained history is cleared afterwards.
-func (d *Debugger) FlushMovementSimBuffer() {
-	retained := 0
-	for tickLogs := range d.movSimHistory.Iter() {
-		if len(tickLogs) > 0 {
-			retained++
-		}
-	}
-
-	written := 0
-	for tickLogs := range d.movSimHistory.Iter() {
-		if len(tickLogs) == 0 {
-			continue
-		}
-		d.writeDebug(DebugModeMovementSim, fmt.Sprintf("--- tick history (-%d) ---", retained-written))
-		for _, entry := range tickLogs {
-			d.writeDebug(DebugModeMovementSim, entry)
-		}
-		written++
-	}
-	if retained > 0 {
-		d.writeDebug(DebugModeMovementSim, "--- current tick ---")
-	}
-	for _, entry := range d.movSimBuf {
-		d.writeDebug(DebugModeMovementSim, entry)
-	}
-
-	// Clear the history so the flushed log strings can be garbage-collected.
-	for i := 0; i < d.movSimHistory.Size(); i++ {
-		_ = d.movSimHistory.Set(i, nil)
-	}
-	d.movSimBuf = d.movSimBuf[:0]
-	d.bufferingMovSim = false
-}
-
-// DiscardMovementSimBuffer moves the buffered logs of the current tick into the retained history and
-// ends buffering. The history holds the logs of at most the last movSimHistoryTicks ticks.
-func (d *Debugger) DiscardMovementSimBuffer() {
-	if len(d.movSimBuf) > 0 {
-		// Append evicts the oldest slot, so its backing array can be recycled as the
-		// buffer for the next tick.
-		recycled, _ := d.movSimHistory.Get(0)
-		_ = d.movSimHistory.Append(d.movSimBuf)
-		d.movSimBuf = recycled[:0]
-	}
-	d.bufferingMovSim = false
 }

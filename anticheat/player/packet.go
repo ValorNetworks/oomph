@@ -117,16 +117,11 @@ func (p *Player) handleClientPacket(ctx *context.HandlePacketContext) {
 			return
 		}
 	case *packet.PlayerAuthInput:
-		if !p.movement.InputAcceptable() {
-			p.Popup("<red>input rate-limited (%d)</red>", p.SimulationFrame)
-			p.tryRunningClientCombat(pk)
-			ctx.Cancel()
+		if !p.observeInteractionMovement(pk) {
+			// Let the native server apply its established malformed-input policy.
+			// Do not put non-finite values into the replica or prediction state.
 			return
 		}
-
-		// Since Oomph utilizes a full-authoritative system for movement, we are always modifying the position in PlayerAuthInput packet
-		// to Oomph's predicted position.
-		ctx.SetModified()
 
 		p.InputMode = pk.InputMode
 		missedSwing := false
@@ -155,6 +150,7 @@ func (p *Player) handleClientPacket(ctx *context.HandlePacketContext) {
 		}
 		if serverVerifiedHit && missedSwing {
 			pk.InputData.Unset(packet.InputFlagMissedSwing)
+			ctx.SetModified()
 		}
 	case *packet.NetworkStackLatency:
 		if p.ACKs().Execute(pk.Timestamp) {

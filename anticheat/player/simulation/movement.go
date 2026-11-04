@@ -462,30 +462,17 @@ func tryCollisions(p *player.Player, src world.BlockSource, dbg *player.Debugger
 		dbg.Notify(player.DebugModeMovementSim, true, "newBBList count: %d", newBBListCount)
 
 		if !hasStepCollisions && game.Vec3HzDistSqr(collisionVel) < game.Vec3HzDistSqr(stepVel) {
-			// HACK: If a step is possible here, we check which the client seems to align itself better with. The reason this is neccessary
-			// is because in some scenarios, the client seems to reject a step even though Oomph thinks it is possible. This is mainly in scenarios
-			// where the player teleports into a block.
-			stepPosDist := stepPos.Sub(movement.Client().Pos()).Len()
-			collisionPosDist := collisionPos.Sub(movement.Client().Pos()).Len()
+			collisionVel = stepVel
+			collisionBB = stepBB
 
-			// We also need to ensure that the client isn't using this mechanic to create some weird movement bypass, so we will check if the
-			// collisionPosDist is within the correction threshold. Even if the stepPosDist is greater than the correction threshold, Oomph is predicting
-			// a step here anyway so it would make zero difference.
-			if collisionPosDist > p.Opts().Movement.CorrectionThreshold || stepPosDist <= collisionPosDist {
-				collisionVel = stepVel
-				collisionBB = stepBB
-
-				// This sliding offset is only used in versions 1.20.60 and below. On newer versions of the game, this sliding offset is no longer used.
-				if useSlideOffset {
-					completedStep = true
-					slideOffset := movement.SlideOffset().Mul(game.SlideOffsetMultiplier)
-					slideOffset[1] += stepVel.Y()
-					movement.SetSlideOffset(slideOffset)
-				}
-				dbg.Notify(player.DebugModeMovementSim, true, "step successful")
-			} else {
-				dbg.Notify(player.DebugModeMovementSim, true, "step failed (client rejection) [clientPos=%v collisionPos=%v stepPos=%v]", movement.Client().Pos(), collisionPos, stepPos)
+			// This sliding offset is only used in versions 1.20.60 and below. On newer versions of the game, this sliding offset is no longer used.
+			if useSlideOffset {
+				completedStep = true
+				slideOffset := movement.SlideOffset().Mul(game.SlideOffsetMultiplier)
+				slideOffset[1] += stepVel.Y()
+				movement.SetSlideOffset(slideOffset)
 			}
+			dbg.Notify(player.DebugModeMovementSim, true, "step successful")
 		} else {
 			dbg.Notify(player.DebugModeMovementSim, true, "step failed")
 		}
