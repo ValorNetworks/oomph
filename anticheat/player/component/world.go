@@ -154,7 +154,7 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 	}
 
 	// Check if the clicked block is too far away from the player's position.
-	prevPos, currPos := c.mPlayer.LastInteractionPosition(), c.mPlayer.InteractionPosition()
+	prevPos, currPos := c.mPlayer.Movement().LastPos(), c.mPlayer.Movement().Pos()
 	if c.mPlayer.Movement().Sneaking() {
 		prevPos[1] += game.SneakingPlayerHeightOffset
 		currPos[1] += game.SneakingPlayerHeightOffset
@@ -280,7 +280,7 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 		return true
 	}
 
-	prevPos, currPos := c.mPlayer.LastInteractionPosition(), c.mPlayer.InteractionPosition()
+	prevPos, currPos := c.mPlayer.Movement().LastPos(), c.mPlayer.Movement().Pos()
 	if c.mPlayer.Movement().Sneaking() {
 		prevPos[1] += game.SneakingPlayerHeightOffset
 		currPos[1] += game.SneakingPlayerHeightOffset

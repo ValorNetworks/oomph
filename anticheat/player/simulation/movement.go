@@ -19,10 +19,10 @@ import (
 )
 
 // SimulatePlayerMovement is a function that runs a movement simulation for
-func SimulatePlayerMovement(p *player.Player, movement player.MovementComponent) bool {
+func SimulatePlayerMovement(p *player.Player, movement player.MovementComponent) {
 	if movement == nil {
 		p.Disconnect(game.ErrorInternalMissingMovementComponent)
-		return false
+		return
 	}
 
 	//assert.IsTrue(movement != nil, "movement component should be non-nil for simulation")
@@ -37,23 +37,23 @@ func SimulatePlayerMovement(p *player.Player, movement player.MovementComponent)
 	// is "unreliable", or if the player currently is in an unloaded chunk.
 	if attemptTeleport(p, p.Dbg) {
 		p.Dbg.Notify(player.DebugModeMovementSim, true, "teleport (newPos=%v)", movement.Pos())
-		return false
+		return
 	}
 
 	if !simulationIsReliable(p, movement) {
 		p.Dbg.Notify(player.DebugModeMovementSim, true, "no movement sim for frame %d: unsupported scenario", p.SimulationFrame)
 		movement.Reset()
-		return false
-	} else if p.World().Chunk(protocol.ChunkPos{int32(math.Floor(float64(movement.Pos().X()))) >> 4, int32(math.Floor(float64(movement.Pos().Z()))) >> 4}) == nil {
+		return
+	} else if p.World().Chunk(protocol.ChunkPos{int32(movement.Pos().X()) >> 4, int32(movement.Pos().Z()) >> 4}) == nil {
 		p.Dbg.Notify(player.DebugModeMovementSim, true, "no movement sim for frame %d: in unloaded chunk, cancelling all movement", p.SimulationFrame)
 		movement.SetVel(mgl32.Vec3{})
-		return false
+		return
 	}
 
 	if movement.Immobile() || !p.Ready {
 		p.Dbg.Notify(player.DebugModeMovementSim, true, "player is immobile")
 		movement.SetVel(mgl32.Vec3{})
-		return false
+		return
 	}
 
 	// Reset the velocity to zero if it's significantly small.
@@ -79,7 +79,7 @@ func SimulatePlayerMovement(p *player.Player, movement player.MovementComponent)
 			movement.SetOnGround(false)
 			simulateGlide(p, movement)
 			movement.SetMov(movement.Vel())
-			return true
+			return
 		}
 
 		movement.SetGliding(false)
@@ -175,7 +175,6 @@ func SimulatePlayerMovement(p *player.Player, movement player.MovementComponent)
 	movement.SetVel(newVel)
 	p.Dbg.Notify(player.DebugModeMovementSim, true, "endOfFrameVel=%v", newVel)
 	p.Dbg.Notify(player.DebugModeMovementSim, true, "serverPos=%v clientPos=%v, diff=%v", movement.Pos(), movement.Client().Pos(), movement.Pos().Sub(movement.Client().Pos()))
-	return true
 }
 
 func simulateGlide(p *player.Player, movement player.MovementComponent) {
@@ -463,17 +462,30 @@ func tryCollisions(p *player.Player, src world.BlockSource, dbg *player.Debugger
 		dbg.Notify(player.DebugModeMovementSim, true, "newBBList count: %d", newBBListCount)
 
 		if !hasStepCollisions && game.Vec3HzDistSqr(collisionVel) < game.Vec3HzDistSqr(stepVel) {
-			collisionVel = stepVel
-			collisionBB = stepBB
+			// HACK: If a step is possible here, we check which the client seems to align itself better with. The reason this is neccessary
+			// is because in some scenarios, the client seems to reject a step even though Oomph thinks it is possible. This is mainly in scenarios
+			// where the player teleports into a block.
+			stepPosDist := stepPos.Sub(movement.Client().Pos()).Len()
+			collisionPosDist := collisionPos.Sub(movement.Client().Pos()).Len()
 
-			// This sliding offset is only used in versions 1.20.60 and below. On newer versions of the game, this sliding offset is no longer used.
-			if useSlideOffset {
-				completedStep = true
-				slideOffset := movement.SlideOffset().Mul(game.SlideOffsetMultiplier)
-				slideOffset[1] += stepVel.Y()
-				movement.SetSlideOffset(slideOffset)
+			// We also need to ensure that the client isn't using this mechanic to create some weird movement bypass, so we will check if the
+			// collisionPosDist is within the correction threshold. Even if the stepPosDist is greater than the correction threshold, Oomph is predicting
+			// a step here anyway so it would make zero difference.
+			if collisionPosDist > p.Opts().Movement.CorrectionThreshold || stepPosDist <= collisionPosDist {
+				collisionVel = stepVel
+				collisionBB = stepBB
+
+				// This sliding offset is only used in versions 1.20.60 and below. On newer versions of the game, this sliding offset is no longer used.
+				if useSlideOffset {
+					completedStep = true
+					slideOffset := movement.SlideOffset().Mul(game.SlideOffsetMultiplier)
+					slideOffset[1] += stepVel.Y()
+					movement.SetSlideOffset(slideOffset)
+				}
+				dbg.Notify(player.DebugModeMovementSim, true, "step successful")
+			} else {
+				dbg.Notify(player.DebugModeMovementSim, true, "step failed (client rejection) [clientPos=%v collisionPos=%v stepPos=%v]", movement.Client().Pos(), collisionPos, stepPos)
 			}
-			dbg.Notify(player.DebugModeMovementSim, true, "step successful")
 		} else {
 			dbg.Notify(player.DebugModeMovementSim, true, "step failed")
 		}

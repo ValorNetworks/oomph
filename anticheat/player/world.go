@@ -117,6 +117,18 @@ func (p *Player) RegenerateWorld() {
 	p.world.PurgeChunks()
 }
 
+func (p *Player) SyncWorld() {
+	// Update the blocks in the world so the client can sync itself properly.
+	pos := p.Movement().Pos()
+	for x := int(math32.Floor(pos[0] - 0.05)); x <= int(pos[0]+0.05); x++ {
+		for y := int(math32.Floor(pos[1] - 0.05)); y <= int(pos[1]+0.05); y++ {
+			for z := int(math32.Floor(pos[2] - 0.05)); z <= int(pos[2]+0.05); z++ {
+				p.SyncBlock(df_cube.Pos{x, y, z})
+			}
+		}
+	}
+}
+
 func (p *Player) SyncBlock(pos df_cube.Pos) {
 	// Avoid syncing blocks when there is a pending update already for that block - it can cause a desync.
 	if p.WorldUpdater().HasPendingUpdate(pos) {
@@ -152,7 +164,7 @@ func (p *Player) PlaceBlock(clickedBlockPos, replaceBlockPos df_cube.Pos, face d
 
 	// Get the player's AABB and translate it to the position of the player. Then check if it intersects
 	// with any of the boxes the block will occupy. If it does, we don't want to place the block.
-	if cube.AnyIntersections(boxes, p.InteractionBoundingBox()) && !utils.CanPassBlock(b) {
+	if cube.AnyIntersections(boxes, p.Movement().BoundingBox()) && !utils.CanPassBlock(b) {
 		p.SyncBlock(replaceBlockPos)
 		p.Inventory().ForceSync()
 		p.Dbg.Notify(DebugModeBlockPlacement, true, "player AABB intersects with block at %v", replaceBlockPos)
@@ -209,8 +221,8 @@ func (p *Player) SendBlockUpdates(positions []protocol.BlockPos) {
 
 func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 	/* chunkPos := protocol.ChunkPos{
-		int32(math32.Floor(p.InteractionPosition().X())) >> 4,
-		int32(math32.Floor(p.InteractionPosition().Z())) >> 4,
+		int32(math32.Floor(p.movement.Pos().X())) >> 4,
+		int32(math32.Floor(p.movement.Pos().Z())) >> 4,
 	} */
 
 	var (
@@ -224,11 +236,6 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 	}
 
 	if pk.InputData.Load(packet.InputFlagPerformBlockActions) {
-		// Block-action filtering still changes this payload even though movement
-		// is now forwarded unchanged. Proxy routing must encode those changes.
-		if p.pkCtx != nil {
-			p.pkCtx.SetModified()
-		}
 		actions, _ := pk.BlockActions.Value()
 		newActions := make([]protocol.PlayerBlockAction, 0, len(actions))
 		for _, action := range actions {
@@ -347,8 +354,8 @@ func (p *Player) blockInteractable(blockPos cube.Pos, interactFace cube.Face) bo
 	}
 
 	interactableFaces := make(map[cube.Face]struct{}, 6)
-	prevPos := cube.PosFromVec3(p.InteractionPosition().Add(mgl32.Vec3{0, game.DefaultPlayerHeightOffset, 0}))
-	currPos := cube.PosFromVec3(p.InteractionPosition().Add(mgl32.Vec3{0, game.DefaultPlayerHeightOffset, 0}))
+	prevPos := cube.PosFromVec3(p.Movement().Pos().Add(mgl32.Vec3{0, game.DefaultPlayerHeightOffset, 0}))
+	currPos := cube.PosFromVec3(p.Movement().Pos().Add(mgl32.Vec3{0, game.DefaultPlayerHeightOffset, 0}))
 	blockX, blockY, blockZ := blockPos[0], blockPos[1], blockPos[2]
 
 	// If the player's head is inside the block they are breaking, allow them to break it.
@@ -491,7 +498,7 @@ func (p *Player) breakContext() block.BreakContext {
 	ctx := block.BreakContext{
 		Underwater:   p.insideOfWater(),
 		AquaAffinity: aquaAffinity,
-		Airborne:     !p.InteractionOnGround(),
+		Airborne:     !p.movement.OnGround(),
 	}
 	if effect, ok := p.effects.Get(packet.EffectHaste); ok {
 		ctx.HasteLevel = int(effect.Amplifier)
@@ -508,7 +515,7 @@ func (p *Player) breakContext() block.BreakContext {
 func (p *Player) insideOfWater() bool {
 	const breathingDistanceBelowEyes = float32(0.11111111)
 
-	eyePos := p.InteractionPosition().Add(mgl32.Vec3{0, game.DefaultPlayerHeightOffset})
+	eyePos := p.movement.Pos().Add(mgl32.Vec3{0, game.DefaultPlayerHeightOffset})
 	blockPos := df_cube.Pos(cube.PosFromVec3(eyePos))
 	water, ok := p.World().Block(blockPos).(block.Water)
 	if !ok {
@@ -519,5 +526,5 @@ func (p *Player) insideOfWater() bool {
 		depth = 1
 	}
 	surface := float32(blockPos[1]+1) - (depth/9 - breathingDistanceBelowEyes)
-	return p.InteractionPosition().Y() < surface
+	return p.movement.Pos().Y() < surface
 }

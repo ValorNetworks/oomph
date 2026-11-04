@@ -27,7 +27,7 @@ func (p *Player) H() *world.EntityHandle {
 }
 
 func (p *Player) Position() mgl64.Vec3 {
-	return game.Vec32To64(p.InteractionPosition())
+	return game.Vec32To64(p.movement.Pos())
 }
 
 func (p *Player) Rotation() cube.Rotation {

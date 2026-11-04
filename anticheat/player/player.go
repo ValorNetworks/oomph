@@ -92,7 +92,10 @@ type Player struct {
 	StackLatency           time.Duration
 	LastServerTick         time.Time
 
-	interaction movementObservation
+	// PendingCorrectionACK is a boolean indicating whether the client has received a correction
+	// Oomph has sent to it. This is used to not spam the client with mutliple corrections which may
+	// cause desync due to the client's own interpolation.
+	PendingCorrectionACK bool
 
 	// IsHungry is a boolean indicating whether the player is hungry.
 	IsHungry bool
@@ -551,12 +554,14 @@ func (p *Player) Tick() bool {
 	delta := p.Time().Sub(p.LastServerTick).Milliseconds()
 	p.LastServerTick = p.Time()
 
+	prevTick := p.ServerTick
 	if delta > 50 {
 		p.ServerTick += (delta / 50) + 1
 	} else {
 		p.ServerTick++
 	}
 
+	p.movement.Tick(p.ServerTick - prevTick)
 	p.entTracker.Tick(p.ServerTick)
 	p.worldUpdater.Tick()
 	p.acks.Tick(false)

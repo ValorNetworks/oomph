@@ -125,8 +125,8 @@ func (c *AuthoritativeCombatComponent) Attack(input *packet.InventoryTransaction
 		if !c.useClientTracker {
 			c.checkMisprediction = true
 			c.attacked = true
-			c.startAttackPos = c.mPlayer.LastInteractionPosition()
-			c.endAttackPos = c.mPlayer.InteractionPosition()
+			c.startAttackPos = c.mPlayer.Movement().LastPos()
+			c.endAttackPos = c.mPlayer.Movement().Pos()
 			if c.mPlayer.Movement().Sneaking() {
 				c.startAttackPos[1] += game.SneakingPlayerHeightOffset
 				c.endAttackPos[1] += game.SneakingPlayerHeightOffset
@@ -156,8 +156,8 @@ func (c *AuthoritativeCombatComponent) Attack(input *packet.InventoryTransaction
 		}
 		c.startEntityPos = rewindPos.PrevPosition
 		c.endEntityPos = rewindPos.Position
-		c.startAttackPos = c.mPlayer.LastInteractionPosition()
-		c.endAttackPos = c.mPlayer.InteractionPosition()
+		c.startAttackPos = c.mPlayer.Movement().LastPos()
+		c.endAttackPos = c.mPlayer.Movement().Pos()
 	} else {
 		c.startEntityPos = e.PrevPosition
 		c.endEntityPos = e.Position
@@ -231,6 +231,12 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 	}
 
 	movement := c.mPlayer.Movement()
+	if c.useClientTracker {
+		if pending := movement.PendingCorrections(); pending > 0 {
+			c.mPlayer.Dbg.Notify(player.DebugModeCombat, true, "movement component indicates pending corrections (%d) - hit invalidated", pending)
+			return false
+		}
+	}
 
 	if movement.HasTeleport() && !movement.TeleportSmoothed() {
 		teleportPos := movement.TeleportPos()
