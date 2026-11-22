@@ -2,6 +2,7 @@ package component
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
@@ -94,8 +95,9 @@ type AuthoritativeMovementComponent struct {
 	airSpeed             float32
 	serverUpdatedSpeed   bool
 
-	knockback    mgl32.Vec3
-	ticksSinceKb uint64
+	knockback         mgl32.Vec3
+	ticksSinceKb      uint64
+	receivedKnockback bool
 
 	pendingTeleportPos mgl32.Vec3
 	pendingTeleports   int
@@ -385,11 +387,20 @@ func (mc *AuthoritativeMovementComponent) Knockback() mgl32.Vec3 {
 func (mc *AuthoritativeMovementComponent) SetKnockback(newKnockback mgl32.Vec3) {
 	mc.knockback = newKnockback
 	mc.ticksSinceKb = 0
+	mc.receivedKnockback = newKnockback != (mgl32.Vec3{})
 }
 
 // HasKnockback returns true if the movement component needs knockback applied on the next simulation.
 func (mc *AuthoritativeMovementComponent) HasKnockback() bool {
 	return mc.ticksSinceKb == 0
+}
+
+// TicksSinceKnockback returns the age of the last server push, or MaxUint64 if none applies.
+func (mc *AuthoritativeMovementComponent) TicksSinceKnockback() uint64 {
+	if !mc.receivedKnockback {
+		return math.MaxUint64
+	}
+	return mc.ticksSinceKb
 }
 
 // Teleport notifies the movement component of a teleport.
@@ -398,6 +409,7 @@ func (mc *AuthoritativeMovementComponent) Teleport(pos mgl32.Vec3, onGround bool
 	mc.onGround = onGround
 	mc.teleportIsSmoothed = smoothed
 	mc.ticksSinceTeleport = 0
+	mc.receivedKnockback = false
 
 	if smoothed {
 		mc.teleportCompletionTicks = 2
@@ -1076,6 +1088,7 @@ func (mc *AuthoritativeMovementComponent) ResetTransferState(pos mgl32.Vec3) {
 
 	mc.knockback = mgl32.Vec3{}
 	mc.ticksSinceKb = 1
+	mc.receivedKnockback = false
 
 	mc.pendingTeleportPos = pos
 	mc.pendingTeleports = 0

@@ -417,7 +417,8 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 	// synthesised packet would let a killaura-as-air-swing register on every
 	// nearby target. Misprediction stays gated on hitValid as the anti-cheat floor.
 	forwardHit := hitValid
-	if !c.useClientTracker && local.DisableFullAuthoritative && !c.checkMisprediction && !hitValid {
+	if !c.useClientTracker && local.DisableFullAuthoritative && !c.checkMisprediction && !hitValid &&
+		(local.RejectedHitMaxReach <= 0 || float64(closestRawDist) <= local.RejectedHitMaxReach) {
 		forwardHit = true
 		c.mPlayer.Dbg.Notify(
 			player.DebugModeCombat,

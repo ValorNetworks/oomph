@@ -72,6 +72,7 @@ var (
 		Movement: MovementOpts{
 			CorrectionThreshold:         0.3,
 			PersuasionThreshold:         0.002,
+			VisiblePositionTolerance:    -1,
 			AcceptClientPosition:        false,
 			PositionAcceptanceThreshold: 0.09,
 			AcceptClientVelocity:        false,

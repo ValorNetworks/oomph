@@ -4,6 +4,14 @@ type MovementOpts struct {
 	// The correction threshold represents the amount of distance in blocks between the client and Oomph's
 	// predicted position is required to trigger a correction.
 	CorrectionThreshold float32 `json:"correction_threshold" comment:"The amount of blocks between the client and Oomph's prediction required to trigger a correction. It is recommended to keep this option at around 0.2-0.5 blocks to avoid large noticable corrections."`
+	// KnockbackGraceTicks applies the relaxed threshold after a server push.
+	KnockbackGraceTicks int `json:"knockback_grace_ticks" comment:"Number of movement ticks to use the knockback threshold after a server push. A non-positive value disables the grace period."`
+	// KnockbackTaperTicks brings the relaxed threshold back to the normal threshold.
+	KnockbackTaperTicks int `json:"knockback_taper_ticks" comment:"Number of movement ticks to return to the normal threshold after knockback grace."`
+	// KnockbackCorrectionThreshold is the correction distance during knockback grace.
+	KnockbackCorrectionThreshold float32 `json:"knockback_correction_threshold" comment:"Correction distance in blocks after a server push. Values at or below the normal threshold disable the relaxed threshold."`
+	// VisiblePositionTolerance controls how far the reported position can trail the client during valid movement.
+	VisiblePositionTolerance float32 `json:"visible_position_tolerance" comment:"Target distance in blocks between the position shown to other players and the client position. Negative disables adjustment. Zero selects 0.15."`
 	// PersuasionThreshold is the amount of blocks per tick Oomph should move towards the client position (given that there are no pending corrections and the player's movement has been valid for a long enough period of time).
 	// Note that this persuasion is not applied on the Y-axis.
 	PersuasionThreshold float32 `json:"persuasion_threshold" comment:"The amount of block per tick Oomph's position moves towards the client's position. Note that the persuasion is not applied on the Y-axis.\nIncreasing this value above the default option will result in slight movement bypasses."`

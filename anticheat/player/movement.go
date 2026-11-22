@@ -1,6 +1,8 @@
 package player
 
 import (
+	"math"
+
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/anticheat/game"
@@ -310,7 +312,17 @@ func (p *Player) handleMovement(pk *packet.PlayerAuthInput) {
 	posDiff := p.movement.Pos().Sub(p.movement.Client().Pos())
 	velDiff := p.movement.Vel().Sub(p.movement.Client().Vel())
 
-	needsCorrection := posDiff.Len() > p.Opts().Movement.CorrectionThreshold
+	opts := p.Opts().Movement
+	sinceKB := uint64(math.MaxUint64)
+	threshold := opts.CorrectionThreshold
+	if opts.KnockbackGraceTicks > 0 && opts.KnockbackCorrectionThreshold > threshold {
+		if movement, ok := p.movement.(interface{ TicksSinceKnockback() uint64 }); ok {
+			sinceKB = movement.TicksSinceKnockback()
+			threshold = correctionThreshold(threshold, opts.KnockbackCorrectionThreshold,
+				opts.KnockbackGraceTicks, opts.KnockbackTaperTicks, sinceKB)
+		}
+	}
+	needsCorrection := posDiff.Len() > threshold
 	if needsCorrection && p.movement.PendingTeleports() == 0 && !hasTeleport &&
 		!pk.InputData.Load(packet.InputFlagJumpPressedRaw) && !hasKnockback {
 		p.movement.Sync()
@@ -344,18 +356,26 @@ func (p *Player) handleMovement(pk *packet.PlayerAuthInput) {
 			// Attempt to shift the server's position slowly towards the client's if the client has the same velocity
 			// as the server. This is to prevent sudden unexpected rubberbanding (mainly from collisions) that may occur if
 			// the client and server position is desynced consistently without going above the correction threshold.
-			if p.Opts().Movement.PersuasionThreshold > 0 {
-				threshold := p.Opts().Movement.PersuasionThreshold
-				posDiff[0] = game.ClampFloat(posDiff[0], -threshold, threshold)
-				posDiff[1] = 0
-				posDiff[2] = game.ClampFloat(posDiff[2], -threshold, threshold)
-
-				p.movement.SetPos(p.movement.Pos().Sub(posDiff))
+			if step := opts.PersuasionThreshold; step > 0 {
+				pos := p.movement.Pos()
+				target := pos.Sub(mgl32.Vec3{
+					game.ClampFloat(posDiff[0], -step, step),
+					0,
+					game.ClampFloat(posDiff[2], -step, step),
+				})
+				if sinceKB != math.MaxUint64 {
+					if pull, ok := knockbackTaperPull(posDiff, velDiff.Len(),
+						opts.KnockbackGraceTicks, opts.KnockbackTaperTicks, sinceKB); ok {
+						target = safePositionAdjustment(p.movement.BoundingBox(), pos, pos.Sub(pull), p.World())
+					}
+				}
+				p.movement.SetPos(target)
+				shift := pos.Sub(target)
 				p.Dbg.Notify(
 					DebugModeMovementSim,
-					posDiff.Len() >= 5e-4,
+					shift.Len() >= 5e-4,
 					"shifted server position by %v (newPos=%v diff=%v)",
-					posDiff,
+					shift,
 					p.movement.Pos(),
 					p.movement.Pos().Sub(p.movement.Client().Pos()),
 				)
@@ -371,16 +391,21 @@ func (p *Player) handleMovement(pk *packet.PlayerAuthInput) {
 
 	// To prevent the server never accepting our position (PMMP), we will always set our position to the final teleport position if a teleport is in progress.
 	// Otherwise, we will use the movement component's prediction.
-	var finalPos mgl32.Vec3
-	if p.Movement().PendingTeleports() > 0 {
-		finalPos = p.Movement().PendingTeleportPos()
-	} else {
-		finalPos = p.Movement().Pos()
+	heightOffset := mgl32.Vec3{0, game.DefaultPlayerHeightOffset + 0.001}
+	if p.movement.PendingTeleports() > 0 {
+		pk.Position = p.movement.PendingTeleportPos().Add(heightOffset)
+		return
 	}
 
-	// Update the position given in this packet to what the server predicts is correct. This is used so that there isn't any weird
-	// rubberbanding that is visible on the POVs of the other players if corrections are sent. This also implies the fact that
-	// other players will be unable to see if another client is using a cheat to modify their movement (e.g - fly). Of course, that is
-	// granted that the movement scenario is supported by Oomph.
-	pk.Position = finalPos.Add(mgl32.Vec3{0, game.DefaultPlayerHeightOffset + 0.001})
+	// The outgoing position can follow valid movement more closely while the
+	// internal prediction stays authoritative.
+	finalPos := p.movement.Pos()
+	if opts.VisiblePositionTolerance >= 0 && !needsCorrection && !hasTeleport &&
+		!hasKnockback && p.movement.PendingCorrections() == 0 && !p.movement.Immobile() {
+		candidate := visiblePosition(finalPos, p.movement.Client().Pos(), opts.VisiblePositionTolerance)
+		candidate[1] += 0.001
+		finalPos = safePositionAdjustment(p.movement.BoundingBox(), finalPos, candidate, p.World())
+		heightOffset[1] = game.DefaultPlayerHeightOffset
+	}
+	pk.Position = finalPos.Add(heightOffset)
 }

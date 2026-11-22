@@ -23,12 +23,13 @@ type CombatOpts struct {
 	// be used to prevent players from using exploits that switch the input mode to touch only when enabled to obtain a combat advantage. This option is recommended to be set to false.
 	AllowSwitchInputMode bool `json:"allow_switch_input_mode" comment:"Should Oomph allow players to switch their input mode?\nIt is recommended to keep this option disabled as it may allow for tiny combat gains from players switching their input mode to touch."`
 
-	// DisableFullAuthoritative removes server-side gating of attack packets:
-	// attacks always forward, while detections still flag rejected hits.
-	DisableFullAuthoritative bool `json:"disable_full_authoritative" comment:"If true, attacks always forward to the remote server even if Oomph's validator rejects them.\nDetections still flag — they just no longer block hit registration. Default: false."`
+	// DisableFullAuthoritative allows rejected hits through the server fallback.
+	DisableFullAuthoritative bool `json:"disable_full_authoritative" comment:"Allow server-side fallback for hits that Oomph rejects. Detections still flag these hits. Default: false."`
 	// DisableBlockOcclusionCheck disables the wall-occlusion check while
 	// retaining reach and angle validation.
 	DisableBlockOcclusionCheck bool `json:"disable_block_occlusion_check" comment:"If true, hits are not invalidated when their ray passes through a solid block.\nUseful when client/server block-state desync (e.g. a recently-broken block) eats legit hits. Default: false."`
+	// RejectedHitMaxReach caps the distance for a hit forwarded by the server fallback.
+	RejectedHitMaxReach float64 `json:"rejected_hit_max_reach" comment:"Maximum hitbox distance in blocks for a rejected hit forwarded to the server. Non-positive values disable this cap."`
 	// RawDistanceFallback accepts in-cone, in-reach hits with no raycast
 	// intersection for non-touch input modes. Touch always uses this fallback.
 	RawDistanceFallback bool `json:"raw_distance_fallback" comment:"If true, accepts the closest-point-on-bbox distance for non-touch input modes when no raycast lands.\nMEANINGFUL WEAKENING of reach detection — accepts any in-cone, in-reach attack. Default: false."`

@@ -8,6 +8,30 @@ import (
 	"testing"
 )
 
+func TestParseRawJSONLoadsMovementAndRejectedHitTuning(t *testing.T) {
+	cfg, err := ParseRawJSON([]byte(`{
+		"version": 7,
+		"movement_opts": {
+			"knockback_grace_ticks": 60,
+			"knockback_taper_ticks": 100,
+			"knockback_correction_threshold": 10,
+			"visible_position_tolerance": 0.15
+		},
+		"combat_opts": {"rejected_hit_max_reach": 3.5}
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	movement := cfg.Movement
+	if movement.KnockbackGraceTicks != 60 || movement.KnockbackTaperTicks != 100 ||
+		movement.KnockbackCorrectionThreshold != 10 || movement.VisiblePositionTolerance != 0.15 {
+		t.Fatalf("movement settings were not loaded: %+v", movement)
+	}
+	if cfg.Combat.RejectedHitMaxReach != 3.5 {
+		t.Fatalf("rejected hit maximum reach = %v, want 3.5", cfg.Combat.RejectedHitMaxReach)
+	}
+}
+
 func TestParseRawJSONMigratesVersionSixCombatValidatorOptions(t *testing.T) {
 	cfg, err := ParseRawJSON([]byte(`{
 		version: 6

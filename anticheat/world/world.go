@@ -19,6 +19,8 @@ type ChunkInfo struct {
 	Cached bool
 	Hash   xxh3.Uint128
 	Chunk  *chunk.Chunk
+
+	unknownLayers uint64
 }
 
 type World struct {
@@ -63,6 +65,45 @@ func (w *World) AddChunk(chunkPos protocol.ChunkPos, c ChunkInfo) {
 	}
 	w.chunks[chunkPos] = c
 	w.exemptedChunks[chunkPos] = struct{}{}
+}
+
+// AddPartialChunk creates a column whose terrain arrives in subchunk packets.
+func (w *World) AddPartialChunk(pos protocol.ChunkPos, c *chunk.Chunk) {
+	w.AddChunk(pos, ChunkInfo{Chunk: c, unknownLayers: ^uint64(0)})
+}
+
+// MarkSubChunkKnown records that the layer was received, including all-air layers.
+func (w *World) MarkSubChunkKnown(pos protocol.ChunkPos, index byte) {
+	info := w.chunks[pos]
+	if info.unknownLayers != 0 {
+		info.unknownLayers &^= uint64(1) << index
+		w.chunks[pos] = info
+	}
+}
+
+// Known reports whether all terrain intersecting the volume has arrived.
+func (w *World) Known(volume cube.BBox) bool {
+	low := cube.PosFromVec3(volume.Min())
+	high := cube.PosFromVec3(volume.Max())
+	for x := low[0] >> 4; x <= high[0]>>4; x++ {
+		for z := low[2] >> 4; z <= high[2]>>4; z++ {
+			info := w.chunks[protocol.ChunkPos{int32(x), int32(z)}]
+			if info.Chunk == nil {
+				return false
+			}
+			if info.unknownLayers == 0 {
+				continue
+			}
+			r := info.Chunk.Range()
+			bottom, top := max(low[1], r[0])>>4, min(high[1], r[1])>>4
+			for y := bottom; y <= top; y++ {
+				if info.unknownLayers&(uint64(1)<<info.Chunk.SubIndex(int16(y*16))) != 0 {
+					return false
+				}
+			}
+		}
+	}
+	return true
 }
 
 // AddSubChunk adds a subchunk to the world.

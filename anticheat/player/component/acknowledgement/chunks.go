@@ -61,27 +61,20 @@ func (ack *SubChunkUpdate) Run() {
 	}()
 	var bufUsed bool
 
-	newChunks := make(map[protocol.ChunkPos]*chunk.Chunk)
+	terrain := ack.mPlayer.World()
 	for _, entry := range ack.pk.SubChunkEntries {
 		chunkPos := protocol.ChunkPos{
 			ack.pk.Position[0] + int32(entry.Offset[0]),
 			ack.pk.Position[2] + int32(entry.Offset[2]),
 		}
-		var ch *chunk.Chunk
-		if new, ok := newChunks[chunkPos]; ok {
-			ch = new
-			ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "reusing chunk in map %v", chunkPos)
-		} else if existing := ack.mPlayer.World().Chunk(chunkPos); existing != nil {
-			// We assume that the existing chunk is not cached because the cache does not support SubChunks for the time being.
-			ch = existing
-			ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "using existing chunk %v", chunkPos)
-		} else {
+		ch := terrain.Chunk(chunkPos)
+		if ch == nil {
 			dimension, ok := world.DimensionByID(int(ack.pk.Dimension))
 			if !ok {
 				dimension = world.Overworld
 			}
 			ch = chunk.New(oworld.BlockRegistry, dimension.Range())
-			newChunks[chunkPos] = ch
+			terrain.AddPartialChunk(chunkPos, ch)
 			ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "new chunk at %v", chunkPos)
 		}
 
@@ -104,18 +97,18 @@ func (ack *SubChunkUpdate) Run() {
 				continue
 			}
 			ch.Sub()[cachedSub.Layer()] = cachedSub.SubChunk()
-			ack.mPlayer.World().AddSubChunk(chunkPos, cachedSub.Hash())
+			terrain.AddSubChunk(chunkPos, cachedSub.Hash())
+			terrain.MarkSubChunkKnown(chunkPos, cachedSub.Layer())
 			ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "cached subchunk %d at %v", cachedSub.Layer(), chunkPos)
 		case protocol.SubChunkResultSuccessAllAir:
+			y := (int(ack.pk.Position[1]) + int(entry.Offset[1])) * 16
+			if r := ch.Range(); y >= r[0] && y <= r[1] {
+				terrain.MarkSubChunkKnown(chunkPos, byte(ch.SubIndex(int16(y))))
+			}
 			ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "all-air chunk at %v", chunkPos)
 		default:
 			ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "no subchunk data for %v (result=%d)", chunkPos, entry.Result)
 			continue
 		}
-	}
-
-	for pos, newChunk := range newChunks {
-		ack.mPlayer.World().AddChunk(pos, oworld.ChunkInfo{Chunk: newChunk, Cached: false})
-		ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "(sub) added chunk at %v", pos)
 	}
 }
